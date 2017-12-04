@@ -15,16 +15,19 @@ set(SRCS
   src/net_utils.cc
 )
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14 -pedantic -Wall -march=native")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -pedantic -Wall -march=native")
 set(CMAKE_BUILD_TYPE "Release")
-set(VERSION "1.6")
+set(VERSION "1.10")
 
-# check for C++14
+# check for C++17
 include(CheckCXXCompilerFlag)
-check_cxx_compiler_flag("-std=c++14" COMPILER_SUPPORTS_CXX14)
-if (NOT COMPILER_SUPPORTS_CXX14)
-  message(FATAL_ERROR "Compiler ${CMAKE_CXX_COMPILER} has no C++14 support.")
+check_cxx_compiler_flag("-std=c++17" HAVE_CPP17)
+if (NOT HAVE_CPP17)
+  message(FATAL_ERROR "Compiler ${CMAKE_CXX_COMPILER} has no C++17 support.")
 endif()
+
+# Set custom RPATH
+SET(CMAKE_INSTALL_RPATH "${CUSTOM_RPATH}")
 
 # Search OpenSSL
 find_package(PkgConfig REQUIRED)
@@ -72,4 +75,7 @@ add_executable(get ${SRCS})
 target_link_libraries(get ${OPENSSL_LIBRARIES})
 target_link_libraries(get ${LIBSSH2_LIBRARIES})
 target_link_libraries(get ${Backtrace_LIBRARIES})
+if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+  target_link_libraries(${PROJECT_NAME} stdc++fs)
+endif()
 install(TARGETS get DESTINATION bin COMPONENT binaries)

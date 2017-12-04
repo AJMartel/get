@@ -11,11 +11,15 @@ the same thing as BSD's fetch.
       options:
         --progress, -p   : show progressbar if available
         --output, -o     : specify output file name
+        --continue, -c   : continue file download
         --follow, -f     : do not follow HTTP redirects
         --verify, -v     : verify server's SSL certificate
         --sslv2, -2      : use SSL version 2
         --sslv3, -3      : use SSL version 3
         --debug, -d      : enable debug output
+        --help, -h       : print this help
+        --version, -x    : print version information
+    get version 1.10 (C) Kurt Kanzenbach <kurt@kmk-computers.de>
 
 Supported right now:
 
@@ -29,20 +33,32 @@ Example:
 
 ## Build ##
 
+### Linux ###
+
     $ mkdir build
     $ cd build
     $ cmake ..
     $ make -j8
+    $ sudo make install
+
+### FreeBSD ###
+
+    $ mkdir build
+    $ cd build
+    $ CC=gcc7 CXX=gcc7 cmake -DCUSTOM_RPATH="/usr/local/lib/gcc7" ..
+    $ make -j8
+    $ sudo make install
 
 ## Dependencies ##
 
+- Modern Compiler with CPP 17 Support (e.g. gcc >= 7 or clang >= 5)
 - OpenSSL (optional, used for HTTPS)
 - LibSSH2 (optional, used for SFTP)
 - termios
 
 ## Author ##
 
-Copyright (C) 2015-2016 Kurt Kanzenbach <kurt@kmk-computers.de>
+Copyright (C) 2015-2017 Kurt Kanzenbach <kurt@kmk-computers.de>
 
 ## License ##
 

@@ -35,6 +35,8 @@
 class ProgressBar
 {
 public:
+    using UnitPair = std::pair<double, std::string>;
+
     ProgressBar(std::size_t bytes) :
         m_cols{Utils::terminal_width()},
         m_bytes{bytes}, m_bytes_received{0}, m_old_position{0},
@@ -43,6 +45,21 @@ public:
     {
         // taking like 50 %
         m_width = m_cols * 50 / 100;
+    }
+
+    ProgressBar(std::size_t start_offset, std::size_t bytes) :
+        m_cols{Utils::terminal_width()},
+        m_bytes{bytes}, m_bytes_received{start_offset},
+        m_old_time{std::chrono::high_resolution_clock::now()},
+        m_old_byte_cnt{start_offset}
+    {
+        // taking like 50 %
+        m_width = m_cols * 50 / 100;
+
+        // get current position
+        const double progress = static_cast<double>(m_bytes_received) /
+            static_cast<double>(m_bytes);
+        m_old_position = progress * m_width;
     }
 
     void update(std::size_t new_bytes = 1);
@@ -56,7 +73,7 @@ private:
     std::chrono::high_resolution_clock::time_point m_old_time;
     std::size_t m_old_byte_cnt;
 
-    std::pair<double, std::string> unit(std::size_t file_size, unsigned precision = 1) const;
+    UnitPair unit(std::size_t file_size, unsigned precision = 1) const;
     std::string build_size() const;
     std::string rate(std::size_t bytes_received);
 };

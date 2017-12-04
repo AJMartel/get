@@ -25,14 +25,14 @@
 
 #include "progress_bar.h"
 
-std::pair<double, std::string> ProgressBar::unit(std::size_t file_size,
-                                                 unsigned precision) const
+ProgressBar::UnitPair ProgressBar::unit(std::size_t file_size,
+                                        unsigned precision) const
 {
-    static const std::array<std::string, 5> units = {
-        { "B" , "KiB", "MiB", "GiB", "TiB" }
+    static const std::array<std::string, 9> units = {
+        { "B" , "KiB", "MiB", "GiB", "TiB", "PiB", "EiB", "ZiB", "YiB" }
     };
 
-    std::array<std::string, 5>::size_type i = 0;
+    std::array<std::string, 9>::size_type i = 0;
     double size = file_size;
     while (size >= 1024.0) {
         size /= 1024.0;
@@ -45,18 +45,18 @@ std::pair<double, std::string> ProgressBar::unit(std::size_t file_size,
     else
         size = std::round(size);
 
-    return { size, units[i] };
+    return { size, units.at(i) };
 }
 
 std::string ProgressBar::build_size() const
 {
     std::stringstream ss;
 
-    auto unit1 = unit(m_bytes_received);
-    auto unit2 = unit(m_bytes);
+    auto [bytes1, unit1] = unit(m_bytes_received);
+    auto [bytes2, unit2] = unit(m_bytes);
 
-    ss << unit1.first << " " << unit1.second << " / "
-       << unit2.first << " " << unit2.second;
+    ss << bytes1 << " " << unit1 << " / "
+       << bytes2 << " " << unit2;
 
     return ss.str();
 }
@@ -71,11 +71,11 @@ std::string ProgressBar::rate(std::size_t bytes_received)
                  now - m_old_time).count();
     m_old_time = now;
     std::size_t rate = bytes_received / elapsed;
-    auto unit_ = unit(rate, 1);
+    auto [bytes, unit_] = unit(rate, 1);
 
     // build
     std::stringstream ss;
-    ss << unit_.first << " " << unit_.second << "/s";
+    ss << bytes << " " << unit_ << "/s";
     return ss.str();
 }
 

@@ -40,7 +40,8 @@ static struct option long_opts[] = {
     { "debug",    no_argument,       NULL, 'd' },
     { "version",  no_argument,       NULL, 'x' },
     { "help",     no_argument,       NULL, 'h' },
-    { NULL,       0,                 NULL,  0  }
+    { "continue", no_argument,       NULL, 'c' },
+    { NULL,       0,                 NULL,  0  },
 };
 
 [[noreturn]] static inline
@@ -50,14 +51,25 @@ void print_usage_and_die(int die)
     std::cerr << "  options:" << std::endl;
     std::cerr << "    --progress, -p   : show progressbar if available" << std::endl;
     std::cerr << "    --output, -o     : specify output file name" << std::endl;
+    std::cerr << "    --continue, -c   : continue file download" << std::endl;
     std::cerr << "    --follow, -f     : do not follow HTTP redirects" << std::endl;
     std::cerr << "    --verify, -v     : verify server's SSL certificate" << std::endl;
     std::cerr << "    --sslv2, -2      : use SSL version 2" << std::endl;
     std::cerr << "    --sslv3, -3      : use SSL version 3" << std::endl;
     std::cerr << "    --debug, -d      : enable debug output" << std::endl;
+    std::cerr << "    --help, -h       : print this help" << std::endl;
+    std::cerr << "    --version, -x    : print version information" << std::endl;
     std::cerr << "get version " << VERSION << " (C) Kurt Kanzenbach <kurt@kmk-computers.de>"
               << std::endl;
     std::exit(die ? EXIT_FAILURE : EXIT_SUCCESS);
+}
+
+[[noreturn]] static inline
+void print_version_and_die()
+{
+    std::cerr << "get version " << VERSION << " (C) Kurt Kanzenbach <kurt@kmk-computers.de>"
+              << std::endl;
+    std::exit(EXIT_SUCCESS);
 }
 
 int main(int argc, char *argv[])
@@ -71,7 +83,7 @@ int main(int argc, char *argv[])
     if (argc <= 1)
         print_usage_and_die(1);
 
-    while ((c = getopt_long(argc, argv, "23dvpfu:k:o:", long_opts, NULL)) != -1) {
+    while ((c = getopt_long(argc, argv, "23dvpfu:k:o:xhc", long_opts, NULL)) != -1) {
         switch (c) {
         case 'p':
             config->show_pg() = true;
@@ -91,10 +103,14 @@ int main(int argc, char *argv[])
         case 'o':
             output = optarg;
             break;
+        case 'c':
+            config->continue_download() = true;
+            break;
         case 'd':
             config->debug() = true;
             break;
         case 'x':
+            print_version_and_die();
         case 'h':
             print_usage_and_die(0);
         default:

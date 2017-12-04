@@ -27,6 +27,7 @@
 #include <fstream>
 #include <string>
 #include <vector>
+#include <type_traits>
 
 #include "get_config.h"
 #include "logger.h"
@@ -37,29 +38,6 @@
 #include "auth_exception.h"
 #include "base64.h"
 #include "config.h"
-
-namespace HTTPHelpers {
-
-    template<typename CONNECTION>
-    class Service
-    {};
-
-    template<>
-    class Service<TCPConnection>
-    {
-    public:
-        static const int PORT = 80;
-    };
-
-#ifdef HAVE_OPENSSL
-    template<>
-    class Service<TCPSSLConnection>
-    {
-    public:
-        static const int PORT = 443;
-    };
-#endif
-}
 
 template<typename CONNECTION = TCPConnection>
 class HTTPMethod : public Method
@@ -74,29 +52,50 @@ public:
         CONNECTION tcp;
         std::string request;
         std::vector<std::string> header;
+        std::ios_base::openmode mode = std::ios_base::out;
         Config *config = Config::instance();
+        int response;
 
-        tcp.connect(req.host(), HTTPHelpers::Service<CONNECTION>::PORT);
+        tcp.connect(req.host(), get_port());
         request = build_http_request(req);
 
         tcp << request;
 
         header = read_http_header(tcp);
-        check_response_code(header);
+        response = check_response_code(header);
 
         auto length = get_content_length(header);
+        log_dbg("File has a size of " << (length + req.start_offset()) << " bytes.");
 
         // save
-        std::ofstream ofs(req.out_file_name());
+        if (response == 206)
+            mode |= std::ios_base::app;
+        std::ofstream ofs(req.out_file_name(), mode);
         if (ofs.fail())
             EXCEPTION("Failed to open file: " << req.out_file_name());
         if (length > 0 && config->show_pg())
-            tcp.read_until_eof_with_pg_to_fstream(ofs, length);
+            tcp.read_until_eof_with_pg_to_fstream(
+                ofs, req.start_offset(), length + req.start_offset());
         else
             tcp.read_until_eof_to_fstream(ofs);
     }
 
 private:
+    constexpr auto get_port() const noexcept
+    {
+        static_assert(std::is_same_v<CONNECTION, TCPConnection>
+#ifdef HAVE_OPENSSL
+                      || std::is_same_v<CONNECTION, TCPSSLConnection>
+#endif
+                      , "HTTPMethod may only be used in combination with "
+                      "TCPConnection or TCPSSLConnection");
+
+        if constexpr (std::is_same_v<CONNECTION, TCPConnection>)
+            return 80;
+        else
+            return 443;
+    }
+
     std::string build_http_request(const Request& req) const
     {
         std::stringstream request;
@@ -123,26 +122,30 @@ private:
             EXCEPTION("OpenSSL is needed for HTTP Basic Auth.");
 #endif
         }
+        if (req.start_offset() > 0) {
+            log_dbg("Trying to continue file download @ " << req.start_offset() << " bytes");
+            request << "Range: bytes=" << req.start_offset() << "-\r\n";
+        }
         request << "\r\n";
 
         return request.str();
     }
 
-    void check_response_code(const std::vector<std::string>& header) const
+    int check_response_code(const std::vector<std::string>& header) const
     {
         int code;
-        const auto& firstLine = header[0];
+        auto&& first_line = header[0];
         std::regex pattern("HTTP/(\\d+\\.\\d+)\\s*(\\d+).*\\r\\n");
         std::smatch match;
-        std::string codeStr;
+        std::string code_str;
 
-        std::regex_match(firstLine, match, pattern);
+        std::regex_match(first_line, match, pattern);
 
         if (match.size() != 3)
             EXCEPTION("Received malformed HTTP Header!");
 
-        codeStr = match[2];
-        code = std::atoi(codeStr.c_str());
+        code_str = match[2];
+        code = std::atoi(code_str.c_str());
         if (code == 404)
             EXCEPTION("The requested object cannot be found on the server!");
 
@@ -154,19 +157,21 @@ private:
         if (code == 401)
             throw AuthException();
 
-        if (code != 200)
+        if (code != 200 && code != 206)
             EXCEPTION("Received unexpected response code from server: " << code);
+
+        return code;
     }
 
     std::vector<std::string> read_http_header(const CONNECTION& tcp) const
     {
         std::vector<std::string> result;
-        std::string line, lastLine;
+        std::string line, last_line;
 
         result.reserve(10);
 
-        while (line != "\r\n" && lastLine != "\r\n") {
-            lastLine = line;
+        while (line != "\r\n" && last_line != "\r\n") {
+            last_line = line;
             line = tcp.read_ln();
             result.push_back(line);
         }
@@ -176,7 +181,7 @@ private:
 
     std::size_t get_content_length(const std::vector<std::string>& header) const
     {
-        for (const auto& line : header) {
+        for (auto&& line : header) {
             std::regex pattern("Content-Length:\\s*(\\d+)\\s*\\r\\n");
             std::smatch match;
 
